@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>合约动向观测器 · Bitget + 美股</title>
+<style>
+  :root{
+    --bg:#07090d; --panel:rgba(255,255,255,.045); --panel2:rgba(255,255,255,.07);
+    --line:rgba(255,255,255,.09); --txt:#e8ecf3; --dim:#8b94a7; --dim2:#5b6475;
+    --up:#22c58b; --down:#f6465d; --gold:#f0b90b; --cyan:#37c8f5; --violet:#8b7cf6;
+    --radius:18px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{background:
+      radial-gradient(900px 480px at 85% -10%, rgba(139,124,246,.20), transparent 60%),
+      radial-gradient(800px 420px at -10% 0%, rgba(55,200,245,.14), transparent 55%),
+      var(--bg);
+    color:var(--txt); font-family:-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    padding:20px 16px 48px; max-width:1080px; margin:0 auto;}
+  header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 18px;margin:8px 2px 18px}
+  h1{font-size:26px;font-weight:800;letter-spacing:.5px;
+     background:linear-gradient(90deg,#fff,#9fd8ff 55%,#c4b5fd);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--dim);font-size:13px}
+  .badge{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .pill{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 12px;font-size:12px;color:var(--dim)}
+  .pill b{color:var(--txt)}
+  section{margin-top:22px}
+  h2{font-size:15px;font-weight:700;color:#cdd6e4;margin:0 2px 10px;display:flex;align-items:center;gap:8px}
+  h2::before{content:"";width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),var(--violet));box-shadow:0 0 10px rgba(55,200,245,.7)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;backdrop-filter:blur(8px)}
+  .alerts{display:grid;gap:8px}
+  .alert{display:flex;gap:10px;align-items:flex-start;background:linear-gradient(90deg,rgba(240,185,11,.12),rgba(255,255,255,.03));
+    border:1px solid rgba(240,185,11,.35);border-radius:14px;padding:10px 14px;font-size:13.5px;line-height:1.5}
+  .alert .dot{flex:none;margin-top:5px;width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold)}
+  .none{color:var(--dim);font-size:13.5px;border:1px dashed var(--line);border-radius:14px;padding:12px 14px;text-align:center}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;position:relative;overflow:hidden}
+  .kpi::after{content:"";position:absolute;inset:0;background:linear-gradient(120deg,transparent 30%,rgba(255,255,255,.05));pointer-events:none}
+  .kpi .sym{font-size:12px;color:var(--dim);letter-spacing:1px}
+  .kpi .price{font-size:23px;font-weight:800;margin:4px 0 2px;font-variant-numeric:tabular-nums}
+  .kpi .row{font-size:12px;color:var(--dim);display:flex;gap:10px}
+  .up{color:var(--up)} .down{color:var(--down)}
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:760px}
+  th{color:var(--dim);font-weight:600;text-align:right;padding:11px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th:first-child,td:first-child{text-align:left}
+  td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.045);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:rgba(255,255,255,.03)}
+  .symcell{font-weight:700}
+  .bar{position:relative;height:6px;border-radius:3px;background:rgba(255,255,255,.08);width:86px;display:inline-block;vertical-align:middle}
+  .bar i{position:absolute;top:0;bottom:0;left:50%;border-radius:3px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media(max-width:720px){.grid2{grid-template-columns:1fr}}
+  .book{font-size:13px;font-variant-numeric:tabular-nums}
+  .book .lvl{display:flex;align-items:center;gap:8px;padding:3px 0}
+  .book .p{width:86px;font-weight:700}
+  .book .q{width:70px;color:var(--dim)}
+  .book .track{flex:1;height:10px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden}
+  .book .fill{height:100%;border-radius:5px}
+  .asks .p{color:var(--down)} .asks .fill{background:linear-gradient(90deg,rgba(246,70,93,.25),rgba(246,70,93,.75))}
+  .bids .p{color:var(--up)} .bids .fill{background:linear-gradient(90deg,rgba(34,197,139,.25),rgba(34,197,139,.75))}
+  .spreadline{text-align:center;color:var(--dim);font-size:12px;padding:7px 0;border-top:1px dashed var(--line);border-bottom:1px dashed var(--line);margin:6px 0}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:8px 12px;font-size:12.5px}
+  .chip b{font-variant-numeric:tabular-nums}
+  .chip span{color:var(--dim);margin-right:6px}
+  .heat{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+  .tile{border-radius:14px;padding:10px 12px;border:1px solid var(--line);font-size:12px}
+  .tile .t{font-weight:800;font-size:14px}
+  .tile .v{font-variant-numeric:tabular-nums;margin-top:2px}
+  footer{margin-top:30px;color:#556072;font-size:12px;line-height:1.7;text-align:center}
+  .err{color:var(--down);text-align:center;padding:30px 10px;font-size:14px}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>合约动向观测器</h1>
+    <div class="sub">Bitget 合约 · 链上资金 · 美股板块 · 事件预警</div>
+  </div>
+  <div class="badge">
+    <div class="pill">更新 <b id="ts">-</b></div>
+    <div class="pill">恐惧贪婪 <b id="fg">-</b></div>
+  </div>
+</header>
+
+<section><h2>异动告警</h2><div class="alerts" id="alerts"><div class="none">加载中…</div></div></section>
+
+<section><h2>核心合约</h2><div class="kpis" id="kpis"></div></section>
+
+<section><h2>合约全表（按 24h 成交额）</h2>
+  <div class="tablewrap"><table><thead><tr>
+    <th>合约</th><th>价格</th><th>24h</th><th>15m</th><th>1h</th><th>资金费率/8h</th><th>持仓量</th><th>多空比</th><th>盘口失衡 ±1%</th>
+  </tr></thead><tbody id="tbody"></tbody></table></div>
+</section>
+
+<section><h2>ZEC 盘口（价格 / 挂单量）</h2>
+  <div class="card book"><div class="asks" id="asks"></div><div class="spreadline" id="spread"></div><div class="bids" id="bids"></div></div>
+</section>
+
+<div class="grid2">
+  <section><h2>链上与情绪</h2><div class="chips" id="chain"></div></section>
+  <section><h2>今日财报（美东）</h2><div class="chips" id="earn"></div></section>
+</div>
+
+<section><h2>美股 · 指数与宏观</h2><div class="kpis" id="usidx"></div></section>
+<section><h2>美股 · 板块强弱（SPDR）</h2><div class="heat" id="sectors"></div></section>
+
+<div class="grid2">
+  <section><h2>美股 · Mag7</h2><div class="chips" id="mag7"></div></section>
+  <section><h2>美股 · 加密联动股</h2><div class="chips" id="cl"></div></section>
+</div>
+
+<footer>仅研究工具 · 不接钱包 · 不下单 · 不承诺盈利<br>数据：Bitget 公开接口 / Yahoo Finance / Nasdaq / Blockchair / DeFiLlama（全部免 key）</footer>
+
+<script>
+const $=id=>document.getElementById(id);
+const pc=v=>v==null?'<span>-</span>':`<span class="${v>=0?'up':'down'}">${v>=0?'+':''}${v.toFixed(2)}%</span>`;
+const fp=p=>p==null?'-':(p>=100?p.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):p>=1?p.toFixed(3):p>=0.01?p.toFixed(4):p.toFixed(8).replace(/0+$/,''));
+const heat=v=>{if(v==null)return 'rgba(255,255,255,.04)';const a=Math.min(Math.abs(v)/3,1)*.45+.06;return v>=0?`rgba(34,197,139,${a})`:`rgba(246,70,93,${a})`};
+fetch('reports/latest.json').then(r=>r.json()).then(d=>{
+  $('ts').textContent=d.ts_cst+' CST';
+  const fg=(d.onchain||{}).fear_greed; if(fg&&fg.value!=null)$('fg').textContent=fg.value+' · '+fg.label;
+  $('alerts').innerHTML=d.alerts&&d.alerts.length?d.alerts.map(a=>`<div class="alert"><div class="dot"></div><div>${a}</div></div>`).join(''):'<div class="none">无异动，全部在阈值内</div>';
+  const core=['BTCUSDT','ETHUSDT','SOLUSDT','ZECUSDT'];
+  $('kpis').innerHTML=d.crypto.filter(s=>core.includes(s.symbol)).map(s=>`
+    <div class="kpi"><div class="sym">${s.symbol.replace('USDT',' / USDT')}</div>
+    <div class="price">${fp(s.price)}</div>
+    <div class="row"><span>24h ${pc(s.change24h_pct)}</span><span>费率 ${(s.funding_rate*100).toFixed(3)}%</span></div></div>`).join('');
+  $('tbody').innerHTML=d.crypto.map(s=>`<tr>
+    <td class="symcell">${s.symbol}</td><td>${fp(s.price)}</td><td>${pc(s.change24h_pct)}</td><td>${pc(s.mom_15m_pct)}</td><td>${pc(s.mom_1h_pct)}</td>
+    <td>${(s.funding_rate*100).toFixed(4)}%</td><td>${Math.round(s.open_interest).toLocaleString('en-US')}</td>
+    <td>${s.ls_ratio?s.ls_ratio.toFixed(2):'-'}</td>
+    <td><span class="bar"><i style="${s.imbalance_1pct>=0?`left:50%;width:${Math.min(s.imbalance_1pct,1)*50}%;background:var(--up)`:`right:50%;width:${Math.min(-s.imbalance_1pct,1)*50}%;background:var(--down)`}"></i></span> ${s.imbalance_1pct>=0?'+':''}${s.imbalance_1pct.toFixed(2)}</td></tr>`).join('');
+  const z=d.zec_book;
+  if(z){const mq=Math.max(...z.top_asks.map(x=>x[1]),...z.top_bids.map(x=>x[1]),0.001);
+    $('asks').innerHTML=[...z.top_asks].reverse().map(([p,q])=>`<div class="lvl"><div class="p">${fp(p)}</div><div class="q">${q}</div><div class="track"><div class="fill" style="width:${q/mq*100}%"></div></div></div>`).join('');
+    $('bids').innerHTML=z.top_bids.map(([p,q])=>`<div class="lvl"><div class="p">${fp(p)}</div><div class="q">${q}</div><div class="track"><div class="fill" style="width:${q/mq*100}%"></div></div></div>`).join('');
+    $('spread').textContent='价差 '+z.spread+' ｜ ±1% 买盘 $'+Math.round(z.bid_depth_1pct_usd).toLocaleString('en-US')+' ｜ 卖盘 $'+Math.round(z.ask_depth_1pct_usd).toLocaleString('en-US');}
+  const c=d.onchain||{};let chips='';
+  if(c.btc_chain&&c.btc_chain.txs_24h)chips+=`<div class="chip"><span>BTC 链 24h 交易</span><b>${c.btc_chain.txs_24h.toLocaleString('en-US')}</b></div><div class="chip"><span>BTC mempool</span><b>${c.btc_chain.mempool_txs.toLocaleString('en-US')}</b></div>`;
+  if(c.zec_chain_transparent_only&&c.zec_chain_transparent_only.txs_24h)chips+=`<div class="chip"><span>ZEC 链 24h 交易（仅透明池）</span><b>${c.zec_chain_transparent_only.txs_24h.toLocaleString('en-US')}</b></div>`;
+  if(c.stablecoin_supply_usd)chips+=`<div class="chip"><span>稳定币总供给</span><b>$${(c.stablecoin_supply_usd/1e9).toFixed(1)}B</b></div>`;
+  $('chain').innerHTML=chips||'<div class="none">暂无数据</div>';
+  $('earn').innerHTML=(d.earnings||[]).map(e=>`<div class="chip"><span>${e.time.replace('time-','')}</span><b>${e.symbol}</b> EPS预期 ${e.eps_forecast||'-'}</div>`).join('')||'<div class="none">今日无财报数据</div>';
+  const names={'^GSPC':'标普 500','^IXIC':'纳斯达克','^DJI':'道琼斯','^VIX':'VIX 恐慌','^TNX':'10年美债 %','DX-Y.NYB':'美元指数'};
+  $('usidx').innerHTML=(d.us.indices||[]).filter(r=>r.price).map(r=>`<div class="kpi"><div class="sym">${names[r.symbol]||r.symbol}</div><div class="price">${fp(r.price)}</div><div class="row"><span>1d ${pc(r.change_1d_pct)}</span><span>5d ${pc(r.change_5d_pct)}</span></div></div>`).join('');
+  const snames={XLK:'科技',XLF:'金融',XLE:'能源',XLV:'医疗',XLI:'工业',XLC:'通讯',XLY:'可选消费',XLP:'必选消费',XLB:'材料',XLRE:'地产',XLU:'公用'};
+  $('sectors').innerHTML=(d.us.sectors||[]).filter(r=>r.change_1d_pct!=null).sort((a,b)=>b.change_1d_pct-a.change_1d_pct).map(r=>`<div class="tile" style="background:${heat(r.change_1d_pct)}"><div class="t">${r.symbol}</div><div>${snames[r.symbol]||''}</div><div class="v ${r.change_1d_pct>=0?'up':'down'}">${r.change_1d_pct>=0?'+':''}${r.change_1d_pct.toFixed(2)}%</div></div>`).join('');
+  const chipRow=(rows)=>rows.filter(r=>r.price).map(r=>`<div class="chip"><span>${r.symbol}</span><b>${fp(r.price)}</b> ${pc(r.change_1d_pct)}</div>`).join('');
+  $('mag7').innerHTML=chipRow(d.us.mag7||[]); $('cl').innerHTML=chipRow(d.us.crypto_linked||[]);
+}).catch(e=>{$('alerts').innerHTML='<div class="err">数据加载失败：reports/latest.json 不可达，等下一次自动扫描或本地运行 python3 -m observer.scan</div>'});
+</script>
+</body>
+</html>
