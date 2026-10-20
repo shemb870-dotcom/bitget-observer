@@ -1,0 +1,1 @@
+{"core_symbols":["BTCUSDT","ETHUSDT","SOLUSDT","ZECUSDT"],"thresholds":{"book_imbalance_abs":0.45,"book_min_depth_usd":100000,"funding_abs":0.0005,"ls_ratio_high":3.0,"ls_ratio_low":0.5,"mom_15m_abs_pct":2.0,"mom_1h_abs_pct":3.5,"oi_change_1h_abs_pct":5.0},"top_volume_extra":16}
