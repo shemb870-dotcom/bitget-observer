@@ -105,6 +105,10 @@
   <section><h2>今日财报（美东）</h2><div class="chips" id="earn"></div></section>
 </div>
 
+<section><h2>巨鲸动向（大额转账）</h2><div id="whales"></div></section>
+
+<section><h2>跨所与宏观</h2><div class="chips" id="extras"></div></section>
+
 <section><h2>美股 · 指数与宏观</h2><div class="kpis" id="usidx"></div></section>
 <section><h2>美股 · 板块强弱（SPDR）</h2><div class="heat" id="sectors"></div></section>
 
@@ -144,6 +148,20 @@ fetch('reports/latest.json').then(r=>r.json()).then(d=>{
   if(c.zec_chain_transparent_only&&c.zec_chain_transparent_only.txs_24h)chips+=`<div class="chip"><span>ZEC 链 24h 交易（仅透明池）</span><b>${c.zec_chain_transparent_only.txs_24h.toLocaleString('en-US')}</b></div>`;
   if(c.stablecoin_supply_usd)chips+=`<div class="chip"><span>稳定币总供给</span><b>$${(c.stablecoin_supply_usd/1e9).toFixed(1)}B</b></div>`;
   $('chain').innerHTML=chips||'<div class="none">暂无数据</div>';
+  const w=d.whales||{};let wh='';
+  const wrow=t=>`<div class="chip"><span>${t.value_native.toLocaleString('en-US')} ${t.hash.slice(0,8)}…</span><b>${t.value_usd?'$'+Math.round(t.value_usd).toLocaleString('en-US'):t.time||'实时'}</b></div>`;
+  if((w.btc||[]).length)wh+=`<div style="margin-bottom:8px"><b>BTC ≥100</b></div><div class="chips">${w.btc.slice(0,8).map(t=>wrow({...t})).join('')}</div>`;
+  else wh+=`<div class="none">BTC ≥100：本轮未见${w.btc_blockchair_status==='limited'?'（Blockchair 限速，下一轮重试）':''}</div>`;
+  if((w.zec_transparent_only||[]).length)wh+=`<div style="margin:10px 0 8px"><b>ZEC ≥1000（仅透明池）</b></div><div class="chips">${w.zec_transparent_only.slice(0,8).map(t=>wrow({...t})).join('')}</div>`;
+  else wh+=`<div class="none">ZEC ≥1000 透明池：本轮未见${w.zec_blockchair_status==='limited'?'（Blockchair 限速，下一轮重试）':''}</div>`;
+  $('whales').innerHTML=wh;
+  const ex=d.extras||{};let ech='';
+  if(ex.okx_oi_funding&&ex.okx_oi_funding.oi_usd)ech+=`<div class="chip"><span>OKX BTC 持仓</span><b>$${(ex.okx_oi_funding.oi_usd/1e9).toFixed(2)}B</b></div>`;
+  if(typeof ex.deribit_dvol_btc==='number')ech+=`<div class="chip"><span>BTC DVOL</span><b>${ex.deribit_dvol_btc.toFixed(2)}</b></div>`;
+  if(typeof ex.farside_btc_flow==='number')ech+=`<div class="chip"><span>BTC ETF 资金流</span><b>$${(ex.farside_btc_flow/1e6).toFixed(0)}M</b></div>`;
+  if(ex.bls&&ex.bls.cpi)ech+=`<div class="chip"><span>CPI ${ex.bls.cpi.period}</span><b>${ex.bls.cpi.value}</b></div>`;
+  if(ex.bls&&ex.bls.nonfarm)ech+=`<div class="chip"><span>非农 ${ex.bls.nonfarm.period}</span><b>${ex.bls.nonfarm.value}千人</b></div>`;
+  $('extras').innerHTML=ech||'<div class="none">暂无数据</div>';
   $('earn').innerHTML=(d.earnings||[]).map(e=>`<div class="chip"><span>${e.time.replace('time-','')}</span><b>${e.symbol}</b> EPS预期 ${e.eps_forecast||'-'}</div>`).join('')||'<div class="none">今日无财报数据</div>';
   const names={'^GSPC':'标普 500','^IXIC':'纳斯达克','^DJI':'道琼斯','^VIX':'VIX 恐慌','^TNX':'10年美债 %','DX-Y.NYB':'美元指数'};
   $('usidx').innerHTML=(d.us.indices||[]).filter(r=>r.price).map(r=>`<div class="kpi"><div class="sym">${names[r.symbol]||r.symbol}</div><div class="price">${fp(r.price)}</div><div class="row"><span>1d ${pc(r.change_1d_pct)}</span><span>5d ${pc(r.change_5d_pct)}</span></div></div>`).join('');

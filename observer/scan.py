@@ -8,7 +8,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from . import bitget, onchain, signals, usboard
+from . import bitget, onchain, signals, usboard, whale, extra
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CST = ZoneInfo("Asia/Shanghai")
@@ -90,6 +90,15 @@ def run():
     except Exception as e:
         us, earnings = {}, []
         alerts.append(f"美股板块拉取失败：{str(e)[:80]}")
+    try:
+        whales = whale.collect()
+    except Exception as e:
+        whales = {"btc": [], "zec_transparent_only": [],
+                  "btc_blockchair_status": "error", "zec_blockchair_status": "error"}
+    try:
+        extras = extra.collect()
+    except Exception:
+        extras = {}
 
     lines = []
     lines.append(f"# 合约动向观测报告")
@@ -130,6 +139,59 @@ def run():
     if chain.get("stablecoin_supply_usd"):
         lines.append(f"- 稳定币总供给：{fmt_usd(chain['stablecoin_supply_usd'])}")
     lines.append("")
+    lines.append("## 巨鲸动向（大额转账，免 key 链上源）")
+    if whales.get("btc"):
+        lines.append(f"- BTC ≥100（{len(whales['btc'])} 笔）：")
+        for t in whales["btc"][:10]:
+            usd = f" ≈ ${t['value_usd']:,.0f}" if t.get("value_usd") else ""
+            lines.append(f"  - {t['value_native']:,.1f} BTC{usd} ｜ {t['hash'][:16]}… ｜ {t['time'] or '内存池/最新区块'}")
+    else:
+        note = "（Blockchair 限速，本轮以 mempool 实时源为准）" if whales.get("btc_blockchair_status") == "limited" else ""
+        lines.append(f"- BTC ≥100：本轮未见{note}")
+    if whales.get("zec_transparent_only"):
+        lines.append(f"- ZEC ≥1000 透明池（{len(whales['zec_transparent_only'])} 笔，仅透明池，屏蔽池不可见）：")
+        for t in whales["zec_transparent_only"][:10]:
+            usd = f" ≈ ${t['value_usd']:,.0f}" if t.get("value_usd") else ""
+            lines.append(f"  - {t['value_native']:,.0f} ZEC{usd} ｜ {t['hash'][:16]}… ｜ {t['time']}")
+    else:
+        note = "（Blockchair 限速，下一轮重试）" if whales.get("zec_blockchair_status") == "limited" else ""
+        lines.append(f"- ZEC ≥1000 透明池：本轮未见{note}")
+    lines.append("")
+    lines.append("## 跨所与宏观（新增免费源）")
+    oi = extras.get("okx_oi_funding") or {}
+    if isinstance(oi, dict) and oi.get("oi_usd"):
+        lines.append(f"- OKX BTC 持仓量：{fmt_usd(oi['oi_usd'])} ｜ 资金费率：{oi['funding_rate']*100:.4f}%（跨所验证 Bitget）")
+    liq = extras.get("okx_liquidations") or []
+    if isinstance(liq, list) and liq:
+        longs = sum(1 for t in liq if t.get("side") == "long")
+        shorts = len(liq) - longs
+        lines.append(f"- OKX 最近爆仓：{len(liq)} 单（多头 {longs} / 空头 {shorts}）")
+    dvol = extras.get("deribit_dvol_btc")
+    if isinstance(dvol, (int, float)):
+        lines.append(f"- Deribit BTC 波动率指数 DVOL：{dvol:.2f}")
+    fb = extras.get("farside_btc_flow")
+    if isinstance(fb, (int, float)):
+        lines.append(f"- BTC ETF 资金流（Farside）：${fb:,.0f}")
+    fe = extras.get("farside_eth_flow")
+    if isinstance(fe, (int, float)):
+        lines.append(f"- ETH ETF 资金流（Farside）：${fe:,.0f}")
+    bls = extras.get("bls") or {}
+    if isinstance(bls, dict) and bls:
+        parts = []
+        if bls.get("cpi"): parts.append(f"CPI {bls['cpi']['period']} {bls['cpi']['value']}")
+        if bls.get("ppi"): parts.append(f"PPI {bls['ppi']['period']} {bls['ppi']['value']}")
+        if bls.get("nonfarm"): parts.append(f"非农 {bls['nonfarm']['period']} {bls['nonfarm']['value']}千人")
+        if parts: lines.append("- 美国宏观（BLS）： " + " ｜ ".join(parts))
+    cc = extras.get("chain_charts") or {}
+    if isinstance(cc, dict) and cc.get("unique_addresses"):
+        lines.append(f"- BTC 链上健康：活跃地址 {cc['unique_addresses']:,.0f}/日 ｜ 算力 {cc['hash_rate']/1e9:.2f} EH/s ｜ 矿工日收入 ${cc['miners_revenue']/1e6:.1f}M")
+    sd = extras.get("stablecoin_delta") or {}
+    if isinstance(sd, dict) and sd.get("USDT"):
+        u = sd["USDT"]
+        dd = f"{(u['now']-u['prev_day'])/1e9:+.2f}B/日" if u.get("now") and u.get("prev_day") else "-"
+        dw = f"{(u['now']-u['prev_week'])/1e9:+.2f}B/周" if u.get("now") and u.get("prev_week") else "-"
+        lines.append(f"- USDT 供给：${u['now']/1e9:.1f}B（{dd}，{dw}）")
+    lines.append("")
     lines.append("## 美股板块")
     idx = {r["symbol"]: r for r in us.get("indices", []) if "price" in r}
     if idx:
@@ -157,6 +219,8 @@ def run():
         "crypto": sorted(snaps, key=lambda x: -x["quote_volume_24h"]),
         "zec_book": focus,
         "onchain": chain,
+        "whales": whales,
+        "extras": extras,
         "us": us,
         "earnings": earnings,
     }

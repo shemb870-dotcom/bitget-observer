@@ -33,5 +33,25 @@ class SignalsTest(unittest.TestCase):
         self.assertTrue(any("持仓量" in a for a in alerts))
 
 
+class WhaleFilterTest(unittest.TestCase):
+    def test_threshold_filters(self):
+        # 模拟 Blockchair 行：output_total 为 satoshi 单位，None 要容错
+        rows = [
+            {"hash": "a", "time": "t", "output_total": 150_00000000, "output_total_usd": 100000},
+            {"hash": "b", "time": "t", "output_total": 50_00000000, "output_total_usd": 50000},
+            {"hash": "c", "time": "t", "output_total": None, "output_total_usd": None},
+        ]
+        import observer.whale as whale
+        orig = whale._get_json
+        whale._get_json = lambda url: {"data": rows}
+        try:
+            out, status = whale.blockchair_large("bitcoin", 100.0)
+        finally:
+            whale._get_json = orig
+        self.assertEqual(status, "ok")
+        self.assertEqual([t["hash"] for t in out], ["a"])
+        self.assertEqual(out[0]["value_native"], 150.0)
+
+
 if __name__ == "__main__":
     unittest.main()

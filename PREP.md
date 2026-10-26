@@ -96,3 +96,28 @@ ZECUSDT 实测快照（03:51）：现价 $1,210.07，24h +7.96%，24h 成交额 
 2. 预警阈值：价格异动 %、资金费率极值、OI 变化 %、盘口失衡，默认值可先用（15m 涨跌 3%、资金费率 ±0.05%、OI 1h 变化 5%）。
 3. 推送渠道：先在这个对话里报，还是要手机推送（可复用事件镜的 Cloudflare Workers 定时任务+免费推送路线）。
 4. 形态：独立小工具（脚本+定时扫描+报告），还是并入事件镜 PWA 加一个「合约观测」页。
+
+## 8. 2026-10-27 扩展：巨鲸追踪 + 新增数据源（已集成、已实测）
+
+### 巨鲸模块 observer/whale.py
+- Blockchair BTC/ZEC 最近 100 笔交易筛大额：BTC ≥100、ZEC ≥1000（仅透明池，屏蔽池不可见，报告必须标注）。
+- mempool.space 实时补充：最新内存池 10 笔 + 最新区块第一页 25 笔；Blockchair 430 限速时自动降级，不中断扫描。
+- 方向四分类框架（参考 dominique1993/Crypto-Whale-Tracker 与 openclaw skill）：exchange_to_exchange / exchange_to_unknown / unknown_to_exchange / unknown_to_unknown；当前无交易所标签包，全部记 unknown_to_unknown（诚实标注，不猜测）。
+- 实测：ZEC 1634.78（约 $198 万）已抓到；BTC 本轮样本无 ≥100 交易（巨鲸交易稀少，30 分钟一扫总能抓到）。
+
+### 新增数据源 observer/extra.py（全部免 key，2026-10-27 实测）
+- OKX 公开 API：爆仓单（必须带 state=filled，返回结构为 details 嵌套数组）、持仓量、资金费率——跨所验证 Bitget。
+- Deribit 公开 API：BTC DVOL 波动率指数（需传毫秒时间戳，取最近 1 小时最后一点；实测 38.43）。
+- Farside：BTC/ETH ETF 资金流（HTML 解析，失败自动跳过；BTC 实测有数，ETH 解析未命中返回 None）。
+- BLS 公开 API v2：CPI CUUR0000SA0、PPI WPUFD49207、非农 CES0000000001（月度，免 key 限 25 次/天，观测器每月拉 3 次足够）。
+- Blockstream：BTC 区块高度（实测 973274）。
+- 未通过（不要集成）：FRED CSV 超时、Binance 451 地理封锁、Bybit 403、OKX 多空比端点不存在、BLS 日程页 403、blockchain.info 图表 404、美国财政部接口 0 条数据。
+
+### 报告与仪表盘
+- scan.py 新增"巨鲸动向"与"跨所与宏观"两节，payload 增加 whales、extras 字段。
+- index.html 新增对应两个板块；测试 5/5（含新增 WhaleFilterTest：阈值过滤 + output_total=None 容错）。
+
+### Blockchair 限流警告（2026-10-27 调研实测）
+- Blockchair 匿名调用过频会触发 IP 临时黑名单（430："Your IP address is temporary blacklisted due to exceeding usage"）。
+- 观测器调用 Blockchair 处：onchain（BTC/ZEC stats）+ whale（BTC/ZEC 最近交易）= 每轮 4 次；Actions 每 30 分钟跑一次、每次换 runner IP，风险低于本机连续调试，但仍需节流意识：不要在 Actions 工作流里加重试循环，不要把扫描间隔改短于 30 分钟。
+- 本机调试 Blockchair 时两次请求间隔至少 60 秒，遇到 430 就停手等下一轮（whale 模块已有 limited 降级，扫描不会因此中断）。
